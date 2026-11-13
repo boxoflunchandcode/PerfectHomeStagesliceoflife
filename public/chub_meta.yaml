@@ -1,128 +1,70 @@
-# Perfect Home Game Stage Configuration
+# Perfect Home Stage — Natalie & the pack
 
-# The name of the stage.
-project_name: "Perfect Home - Game Tracker"
+project_name: "Perfect Home"
 
-# A short tagline to show in search.
-tagline: "Track your witch's stats, heroes, servants, and manor in the Perfect Home game"
+tagline: "House status, inventory, calendar, and character state for Natalie and Victor"
 
-# 'PUBLIC', 'PRIVATE', or 'UNLISTED'.
-visibility: 'PUBLIC'
+visibility: 'PRIVATE'
 
-# 'ADJACENT' | 'NONE' | 'COVER' | 'FULLSCREEN'
-# COVER overlays the chat history but leaves the input box
-# FULLSCREEN covers everything except the header
-position: 'FULLSCREEN'
+# ADJACENT = side panel (recommended)
+# COVER = overlays chat history
+# FULLSCREEN = covers almost everything
+position: 'ADJACENT'
 
-# Tags for discovery
 tags:
-  - 'Game'
-  - 'RPG'
-  - 'Stats'
-  - 'Tracker'
-  - 'Perfect Home'
-  - 'Hypnosis'
+  - 'slice-of-life'
+  - 'inventory'
+  - 'calendar'
+  - 'character'
+  - 'house'
+  - 'bunnygirl'
 
-# The schema of any user-supplied config.
 config_schema:
   type: object
-  title: "Perfect Home Display Settings"
-  description: "Configure what information to display"
+  title: "Display Settings"
   properties:
     theme:
       title: "Theme"
-      description: "Visual theme for the stage"
       type: string
-      enum: ['dark', 'light', 'purple']
+      enum: ['dark', 'light']
       default: 'dark'
-    showStats:
-      title: "Show Witch Stats"
-      description: "Display health, mana, corruption, and other witch statistics"
-      type: boolean
-      default: true
-    showHeroes:
-      title: "Show Heroes"
-      description: "Display encountered and captured heroes"
-      type: boolean
-      default: true
-    showServants:
-      title: "Show Servants"
-      description: "Display converted servants"
-      type: boolean
-      default: true
-    showManor:
-      title: "Show Manor Upgrades"
-      description: "Display manor upgrades and improvements"
-      type: boolean
-      default: true
     showInventory:
       title: "Show Inventory"
-      description: "Display collected items"
       type: boolean
       default: true
-    showDungeon:
-      title: "Show Dungeon Progress"
-      description: "Display dungeon exploration progress"
+    showCalendar:
+      title: "Show Calendar"
       type: boolean
       default: true
-    compactMode:
-      title: "Compact Mode"
-      description: "Use a more condensed display layout"
+    showImages:
+      title: "Show Image Gallery"
       type: boolean
-      default: false
+      default: true
 
-# The schema of the state that you store.
 state_schema:
   init:
     type: object
     properties:
-      startDate:
-        type: string
-      gameVersion:
+      started:
         type: string
   message:
     type: object
     properties:
-      stats:
-        type: object
+      inventory:
+        type: array
+      calendar:
+        type: array
       location:
         type: string
-      heroes:
-        type: object
-      servants:
-        type: object
-      inventory:
-        type: object
-      manorUpgrades:
-        type: object
-      dungeonProgress:
-        type: object
+      desire:
+        type: string
+      outfit:
+        type: string
+      images:
+        type: array
   chat:
     type: object
-    properties:
-      discoveredLocations:
-        type: array
-        items:
-          type: string
-      totalHeroesCaptured:
-        type: integer
-      totalServantsConverted:
-        type: integer
-      achievements:
-        type: array
-        items:
-          type: string
+    properties: {}
 
-# Whether to publish as 'Anonymous' instead of under your username.
 is_anonymous: false
-
-# Self-explanatory.
 ratings_disabled: false
-
-
-
-github_path: 'https://github.com/Carthaphylus/PerfectHomeStage'
-
-
-extension_id: 'perfecthomestage-0d3ee34c346d'
-
