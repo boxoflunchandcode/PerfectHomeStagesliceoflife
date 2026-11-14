@@ -2,219 +2,378 @@ import { ReactElement } from "react";
 import { StageBase, StageResponse, InitialData, Message } from "@chub-ai/stages-ts";
 import { LoadResponse } from "@chub-ai/stages-ts/dist/types/load";
 
-// ────────────────────────────────────────────────
-// Types
-// ────────────────────────────────────────────────
+type MessageStateType = any;
+type ConfigType = any;
+type InitStateType = any;
+type ChatStateType = any;
 
-export type DesireLevel = "low" | "medium" | "high" | "extreme";
-export type CumLevel = "none" | "light" | "moderate" | "full" | "overflowing";
-
-export interface EquippedItem {
+interface InventoryItem {
   id: string;
   name: string;
-  slot: "collar" | "top" | "bottom" | "underwear" | "accessory" | "jewelry" | "phone" | "other";
+  owner: string; // character name or "house"
+  status: "worn" | "stored";
+  location: string; // room or "on person"
+  notes?: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  date: string;
+  title: string;
   description?: string;
-  wornSince?: string; // ISO date
 }
 
-export interface InventoryItem extends EquippedItem {
-  quantity: number;
-  location?: string; // "worn", "bedroom closet", "kitchen drawer", etc.
-}
-
-export interface CharacterState {
+interface CharacterState {
   name: string;
-  role: "first_mate" | "pack" | "other";
-  location: string; // room name
-  currentOutfit: EquippedItem[];
-  desire: DesireLevel;
-  orgasmsToday: number;
-  cumLevel: CumLevel;
-  marks: { type: string; location: string; notes?: string; since: string }[];
+  role: string;
+  location: string;
+  desire: "low" | "medium" | "high" | "extreme";
+  orgasms: number;
+  cum: "none" | "light" | "moderate" | "full" | "overflowing";
+  outfit: string;
+  outfitImage?: string;
+  marks: string;
+  mood: string;
   notes: string;
 }
 
-export interface CalendarEvent {
-  id: string;
-  date: string; // YYYY-MM-DD
-  time?: string;
-  title: string;
-  description?: string;
-  characters?: string[];
-  completed?: boolean;
-}
-
-export interface MessageStateType {
-  day: number;
-  date: string; // YYYY-MM-DD
-  characters: Record<string, CharacterState>;
-  inventory: Record<string, InventoryItem>;
-  rooms: Record<string, string[]>; // room -> character names currently there
-  events: CalendarEvent[];
-  lastUpdated: string;
-}
-
-export type ChatStateType = {
-  houseName?: string;
-};
-
-export type InitStateType = {
-  started: string;
-};
-
-export type ConfigType = {
-  showDesire: boolean;
-  showInventory: boolean;
-  compactInjection: boolean;
-};
-
-// ────────────────────────────────────────────────
-// Stage
-// ────────────────────────────────────────────────
-
 export class Stage extends StageBase<InitStateType, ChatStateType, MessageStateType, ConfigType> {
-  public currentState: MessageStateType;
-  public config: ConfigType;
+  private day: number = 1;
+  private date: string = new Date().toISOString().slice(0, 10);
+  private characters: CharacterState[] = [
+    {
+      name: "Natalie",
+      role: "first_mate",
+      location: "Master Bedroom",
+      desire: "medium",
+      orgasms: 0,
+      cum: "none",
+      outfit: "Grey-blue leather collar (Natalie / Victor + blue gem V), Deep v-neck brown sweater, Short jean shorts, White panties",
+      marks: "none",
+      mood: "",
+      notes: "Warm tsundere, fully open, first mate."
+    },
+    {
+      name: "Vesper",
+      role: "pack",
+      location: "Home",
+      desire: "low",
+      orgasms: 0,
+      cum: "none",
+      outfit: "—",
+      marks: "none",
+      mood: "",
+      notes: ""
+    },
+    {
+      name: "Mira",
+      role: "pack",
+      location: "Home",
+      desire: "low",
+      orgasms: 0,
+      cum: "none",
+      outfit: "—",
+      marks: "none",
+      mood: "",
+      notes: ""
+    }
+  ];
+
+  private inventory: InventoryItem[] = [
+    { id: "collar-nat", name: "Grey-blue leather collar (Natalie / Victor + blue gem V)", owner: "Natalie", status: "worn", location: "on person" },
+    { id: "sweater-nat", name: "Deep v-neck brown sweater", owner: "Natalie", status: "worn", location: "on person" },
+    { id: "shorts-nat", name: "Short jean shorts", owner: "Natalie", status: "worn", location: "on person" },
+    { id: "panties-nat", name: "White panties", owner: "Natalie", status: "worn", location: "on person" }
+  ];
+
+  private events: CalendarEvent[] = [];
+
+  private rooms = ["Entryway", "Living Room", "Kitchen", "Dining Room", "Master Bedroom", "Master Bath", "Natalie's Room", "Basement (Man Cave)", "Garden"];
+
+  private outfitOptions = [
+    "Grey-blue leather collar (Natalie / Victor + blue gem V), Deep v-neck brown sweater, Short jean shorts, White panties",
+    "Periwinkle sheer blouse + dusty rose pleated skirt",
+    "Navy knee-length dress with slit",
+    "Victor's shirt + jean shorts",
+    "Nude under open robe",
+    "—"
+  ];
+
+  private desireLevels: Array<"low" | "medium" | "high" | "extreme"> = ["low", "medium", "high", "extreme"];
 
   constructor(data: InitialData<InitStateType, ChatStateType, MessageStateType, ConfigType>) {
     super(data);
-    const { config, messageState } = data;
-
-    this.config = {
-      showDesire: config?.showDesire !== false,
-      showInventory: config?.showInventory !== false,
-      compactInjection: config?.compactInjection !== false,
-    };
-
-    this.currentState = messageState || this.getDefaultState();
-  }
-
-  private getDefaultState(): MessageStateType {
-    const today = new Date().toISOString().split("T")[0];
-    return {
-      day: 1,
-      date: today,
-      characters: {
-        Natalie: {
-          name: "Natalie",
-          role: "first_mate",
-          location: "Master Bedroom",
-          currentOutfit: [
-            { id: "collar", name: "Grey-blue leather collar (Natalie / Victor + blue gem V)", slot: "collar" },
-            { id: "sweater", name: "Deep v-neck brown sweater", slot: "top" },
-            { id: "shorts", name: "Short jean shorts", slot: "bottom" },
-            { id: "panties", name: "White panties", slot: "underwear" },
-          ],
-          desire: "medium",
-          orgasmsToday: 0,
-          cumLevel: "none",
-          marks: [],
-          notes: "Warm tsundere, fully open, first mate.",
-        },
-      },
-      inventory: {},
-      rooms: {
-        "Master Bedroom": ["Natalie"],
-        "Kitchen": [],
-        "Living Room": [],
-        "Garden": [],
-        "Basement (Man Cave)": [],
-      },
-      events: [],
-      lastUpdated: new Date().toISOString(),
-    };
+    this.day = data.messageState?.day ?? 1;
+    this.date = data.messageState?.date ?? this.date;
+    if (data.messageState?.characters) this.characters = data.messageState.characters;
+    if (data.messageState?.inventory) this.inventory = data.messageState.inventory;
+    if (data.messageState?.events) this.events = data.messageState.events;
   }
 
   async load(): Promise<Partial<LoadResponse<InitStateType, ChatStateType, MessageStateType>>> {
     return {
       success: true,
       error: null,
-      initState: { started: new Date().toISOString() },
-      chatState: {},
+      data: this.getMessageState()
     };
   }
-
-  async setState(state: MessageStateType): Promise<void> {
-    if (state) {
-      this.currentState = { ...this.getDefaultState(), ...state };
-      // Ensure required fields exist
-      if (!this.currentState.characters.Natalie) {
-        this.currentState.characters.Natalie = this.getDefaultState().characters.Natalie;
-      }
-    }
-  }
-
-  // ──────────────────────────────────────────────
-  // Prompt injection (every turn)
-  // ──────────────────────────────────────────────
 
   async beforePrompt(userMessage: Message): Promise<Partial<StageResponse<ChatStateType, MessageStateType>>> {
-    const injection = this.buildStatusInjection();
-
+    const status = this.buildStatusBlock();
     return {
-      stageDirections: injection,
-      messageState: this.currentState,
+      stageDirections: `<HouseStatus>\n${status}\n</HouseStatus>`,
+      messageState: this.getMessageState()
     };
   }
 
-  private buildStatusInjection(): string {
-    const s = this.currentState;
+  async afterResponse(botMessage: Message): Promise<Partial<StageResponse<ChatStateType, MessageStateType>>> {
+    return {
+      messageState: this.getMessageState()
+    };
+  }
+
+  async onSwipe(message: Message, isBot: boolean): Promise<Partial<StageResponse<ChatStateType, MessageStateType>>> {
+    return { messageState: this.getMessageState() };
+  }
+
+  private getMessageState(): MessageStateType {
+    return {
+      day: this.day,
+      date: this.date,
+      characters: this.characters,
+      inventory: this.inventory,
+      events: this.events
+    };
+  }
+
+  private buildStatusBlock(): string {
     const lines: string[] = [];
-
-    lines.push(`[HOUSE STATUS — Day ${s.day} (${s.date})]`);
-
-    // Characters
-    for (const char of Object.values(s.characters)) {
-      const outfit = char.currentOutfit.map(i => i.name).join(", ") || "nothing notable";
-      lines.push(
-        `${char.name} (${char.role}): ${char.location} | Outfit: ${outfit} | Desire: ${char.desire} | Orgasms today: ${char.orgasmsToday} | Cum: ${char.cumLevel}`
-      );
-      if (char.marks.length) {
-        lines.push(`  Marks: ${char.marks.map(m => `${m.type} on ${m.location}`).join("; ")}`);
-      }
+    lines.push(`Day ${this.day} — ${this.date}`);
+    lines.push("");
+    lines.push("CHARACTERS:");
+    this.characters.forEach(c => {
+      lines.push(`- ${c.name} (${c.role}): ${c.location} | Desire: ${c.desire} | Orgasms: ${c.orgasms} | Cum: ${c.cum} | Outfit: ${c.outfit} | Marks: ${c.marks}`);
+    });
+    lines.push("");
+    lines.push("INVENTORY (worn):");
+    this.inventory.filter(i => i.status === "worn").forEach(i => {
+      lines.push(`- ${i.name} (${i.owner})`);
+    });
+    if (this.events.length) {
+      lines.push("");
+      lines.push("EVENTS:");
+      this.events.slice(-3).forEach(e => lines.push(`- ${e.date}: ${e.title}`));
     }
-
-    // Upcoming events (next 3)
-    const upcoming = s.events
-      .filter(e => !e.completed && e.date >= s.date)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 3);
-    if (upcoming.length) {
-      lines.push("Upcoming: " + upcoming.map(e => `${e.date}${e.time ? " " + e.time : ""} — ${e.title}`).join(" | "));
-    }
-
-    lines.push("[End status]");
     return lines.join("\n");
   }
 
-  // ──────────────────────────────────────────────
-  // Simple helpers the UI or you can call
-  // ──────────────────────────────────────────────
-
-  updateCharacter(name: string, partial: Partial<CharacterState>) {
-    if (!this.currentState.characters[name]) return;
-    this.currentState.characters[name] = { ...this.currentState.characters[name], ...partial };
-    this.currentState.lastUpdated = new Date().toISOString();
+  private updateCharacter(name: string, field: keyof CharacterState, value: any) {
+    const c = this.characters.find(x => x.name === name);
+    if (c) (c as any)[field] = value;
   }
 
-  addEvent(event: Omit<CalendarEvent, "id">) {
-    const id = "evt_" + Date.now();
-    this.currentState.events.push({ ...event, id });
+  private addInventoryItem(item: InventoryItem) {
+    this.inventory.push(item);
   }
 
-  // ──────────────────────────────────────────────
-  // Render (minimal for now — expand BaseScreen as needed)
-  // ──────────────────────────────────────────────
+  private addEvent(event: CalendarEvent) {
+    this.events.push(event);
+  }
 
   render(): ReactElement {
     return (
-      <div style={{ fontFamily: "system-ui", padding: "8px", fontSize: "13px", color: "#e0e0e0", background: "#1a1a1a" }}>
-        <div style={{ fontWeight: "bold", marginBottom: "6px" }}>House Status</div>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{this.buildStatusInjection()}</pre>
-        <div style={{ marginTop: "8px", opacity: 0.7, fontSize: "11px" }}>
-          Full panels (inventory, calendar, rooms, desire) can be expanded in BaseScreen.
+      <div style={{ padding: "12px", fontFamily: "system-ui, sans-serif", color: "#e0e0e0", background: "#1a1a1a", height: "100%", overflow: "auto" }}>
+        <h3 style={{ margin: "0 0 8px 0" }}>House Status</h3>
+        <div style={{ marginBottom: "12px" }}>Day {this.day} — {this.date}</div>
+
+        <div style={{ marginBottom: "12px" }}>
+          <strong>Quick set Natalie location</strong>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+            {this.rooms.map(r => (
+              <button
+                key={r}
+                onClick={() => { this.updateCharacter("Natalie", "location", r); this.forceUpdate?.(); }}
+                style={{ padding: "4px 8px", background: "#333", color: "#fff", border: "1px solid #555", borderRadius: "4px", cursor: "pointer", fontSize: "0.85em" }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <strong>Characters</strong>
+          {this.characters.map(c => (
+            <div key={c.name} style={{ border: "1px solid #444", borderRadius: "6px", padding: "8px", marginTop: "8px" }}>
+              <div><strong>{c.name}</strong> ({c.role})</div>
+
+              <div style={{ marginTop: "6px" }}>Location:</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                {this.rooms.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => { c.location = r; this.forceUpdate?.(); }}
+                    style={{
+                      padding: "2px 6px",
+                      background: c.location === r ? "#4a7" : "#333",
+                      color: "#fff",
+                      border: "1px solid #555",
+                      borderRadius: "3px",
+                      cursor: "pointer",
+                      fontSize: "0.85em"
+                    }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginTop: "6px" }}>Desire:</div>
+              <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
+                {this.desireLevels.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => { c.desire = d; this.forceUpdate?.(); }}
+                    style={{
+                      padding: "2px 8px",
+                      background: c.desire === d ? "#a47" : "#333",
+                      color: "#fff",
+                      border: "1px solid #555",
+                      borderRadius: "3px",
+                      cursor: "pointer",
+                      fontSize: "0.85em"
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginTop: "6px" }}>Outfit:</div>
+              <select
+                value={c.outfit}
+                onChange={e => { c.outfit = e.target.value; this.forceUpdate?.(); }}
+                style={{ width: "100%", background: "#222", color: "#fff", border: "1px solid #444", padding: "4px", marginTop: "4px" }}
+              >
+                {this.outfitOptions.map(o => (
+                  <option key={o} value={o}>{o.length > 60 ? o.slice(0, 57) + "..." : o}</option>
+                ))}
+              </select>
+
+              {c.outfitImage && (
+                <img src={c.outfitImage} alt="outfit" style={{ maxWidth: "100%", maxHeight: "120px", marginTop: "6px", borderRadius: "4px" }} />
+              )}
+
+              <div style={{ marginTop: "6px" }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        c.outfitImage = reader.result as string;
+                        this.forceUpdate?.();
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{ fontSize: "0.8em" }}
+                />
+              </div>
+
+              <div style={{ marginTop: "6px" }}>Orgasms: {c.orgasms} | Cum: {c.cum}</div>
+              <div>Marks: {c.marks}</div>
+              <div>Mood</div>
+              <input
+                value={c.mood}
+                onChange={e => { c.mood = e.target.value; }}
+                style={{ width: "100%", background: "#222", color: "#fff", border: "1px solid #444", padding: "4px" }}
+              />
+              <div>Notes</div>
+              <input
+                value={c.notes}
+                onChange={e => { c.notes = e.target.value; }}
+                style={{ width: "100%", background: "#222", color: "#fff", border: "1px solid #444", padding: "4px" }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <strong>Inventory</strong>
+          <div style={{ marginTop: "6px" }}>
+            {this.inventory.map(item => (
+              <div key={item.id} style={{ fontSize: "0.9em", marginBottom: "4px" }}>
+                {item.status === "worn" ? "●" : "○"} {item.name} — {item.owner} ({item.location})
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: "8px" }}>
+            <input id="newItemName" placeholder="New item name" style={{ width: "60%", background: "#222", color: "#fff", border: "1px solid #444", padding: "4px" }} />
+            <button
+              onClick={() => {
+                const input = document.getElementById("newItemName") as HTMLInputElement;
+                if (input?.value) {
+                  this.addInventoryItem({
+                    id: Date.now().toString(),
+                    name: input.value,
+                    owner: "Natalie",
+                    status: "stored",
+                    location: "Master Bedroom"
+                  });
+                  input.value = "";
+                  this.forceUpdate?.();
+                }
+              }}
+              style={{ marginLeft: "6px", padding: "4px 8px", background: "#444", color: "#fff", border: "none", borderRadius: "4px" }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <strong>Calendar / Events</strong>
+          <div style={{ marginTop: "6px" }}>
+            {this.events.length === 0 && <div style={{ opacity: 0.6 }}>No events yet.</div>}
+            {this.events.map(e => (
+              <div key={e.id} style={{ fontSize: "0.9em", marginBottom: "4px" }}>
+                {e.date}: {e.title}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: "8px" }}>
+            <input id="newEventDate" type="date" style={{ background: "#222", color: "#fff", border: "1px solid #444", padding: "4px" }} />
+            <input id="newEventTitle" placeholder="Event title" style={{ marginLeft: "6px", background: "#222", color: "#fff", border: "1px solid #444", padding: "4px" }} />
+            <button
+              onClick={() => {
+                const dateInput = document.getElementById("newEventDate") as HTMLInputElement;
+                const titleInput = document.getElementById("newEventTitle") as HTMLInputElement;
+                if (dateInput?.value && titleInput?.value) {
+                  this.addEvent({
+                    id: Date.now().toString(),
+                    date: dateInput.value,
+                    title: titleInput.value
+                  });
+                  titleInput.value = "";
+                  this.forceUpdate?.();
+                }
+              }}
+              style={{ marginLeft: "6px", padding: "4px 8px", background: "#444", color: "#fff", border: "none", borderRadius: "4px" }}
+            >
+              Add Event
+            </button>
+          </div>
         </div>
       </div>
     );
+  }
+
+  // Simple force update helper for React class component
+  private forceUpdate?: () => void;
+  componentDidMount() {
+    this.forceUpdate = () => this.setState({});
   }
 }
