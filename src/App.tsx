@@ -2,8 +2,7 @@ import React from "react";
 import { Stage } from "./Stage";
 import { InitialData } from "@chub-ai/stages-ts";
 
-// Minimal dummy data so the stage can be constructed in dev
-const dummyData: InitialData<any, any, any, any> = {
+const dummyData = {
   characters: {},
   users: {},
   config: null,
@@ -11,9 +10,7 @@ const dummyData: InitialData<any, any, any, any> = {
   environment: "development",
   initState: null,
   chatState: null,
-  token: "",
-  id: 0,
-};
+} as InitialData<any, any, any, any>;
 
 export default function App() {
   const stage = new Stage(dummyData);
