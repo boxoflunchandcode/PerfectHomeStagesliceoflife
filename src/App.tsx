@@ -1,13 +1,21 @@
-import {ReactRunner} from "@chub-ai/stages-ts";
-import {Stage} from "./Stage";
-import {TestStageRunner} from "./TestRunner";
+import React from "react";
+import { Stage } from "./Stage";
+import { InitialData } from "@chub-ai/stages-ts";
 
-function App() {
-  const isDev = import.meta.env.MODE === 'development';
-  console.info(`Running in ${import.meta.env.MODE}`);
+// Minimal dummy data so the stage can be constructed in dev
+const dummyData: InitialData<any, any, any, any> = {
+  characters: {},
+  users: {},
+  config: null,
+  messageState: null,
+  environment: "development",
+  initState: null,
+  chatState: null,
+  token: "",
+  id: 0,
+};
 
-  return isDev ? <TestStageRunner factory={ (data: any) => new Stage(data) }/> :
-      <ReactRunner factory={(data: any) => new Stage(data)} />;
+export default function App() {
+  const stage = new Stage(dummyData);
+  return stage.render();
 }
-
-export default App
